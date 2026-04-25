@@ -1,0 +1,35 @@
+.study-plan { max-width: 1100px; }
+.plan-layout { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+.plan-main { display: flex; flex-direction: column; gap: 16px; }
+
+.day-selector { display: flex; gap: 8px; }
+.day-btn {
+  flex: 1; padding: 10px 6px; border-radius: var(--radius-sm);
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.day-btn:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+.day-btn.active { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(124,106,247,0.08); }
+.day-label { font-size: 13px; font-weight: 600; }
+.day-dot-wrap { display: flex; gap: 2px; }
+.day-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent-primary); }
+
+.day-summary { }
+.day-progress-circle { width: 60px; height: 60px; flex-shrink: 0; }
+.day-progress-circle svg { width: 60px; height: 60px; }
+
+.tasks-list { display: flex; flex-direction: column; gap: 12px; }
+.task-card { display: flex; gap: 16px; }
+.task-card.task-done { opacity: 0.55; }
+.task-timeline { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; }
+.task-time { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.task-line { width: 2px; flex: 1; min-height: 20px; border-radius: 1px; }
+.task-body { flex: 1; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-secondary); }
+.task-subject { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.task-topic { font-size: 13px; color: var(--text-secondary); }
+
+.plan-sidebar { display: flex; flex-direction: column; gap: 16px; }
+.generate-card { }
+
+@media (max-width: 900px) { .plan-layout { grid-template-columns: 1fr; } }

@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo '>>> Pulling code from GitHub...'
+                checkout scm
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'chmod +x mvnw'
+                    sh './mvnw clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                dir('backend') {
+                    sh './mvnw test'
+                }
+            }
+        post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: 'backend/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh 'docker compose build backend frontend'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh 'docker compose up -d --force-recreate postgres'
+                sh 'sleep 10'
+                sh 'docker compose up -d --force-recreate backend'
+                sh 'sleep 5'
+                sh 'docker compose up -d --force-recreate frontend'
+                 }
+            }
+        }
+
+        post {
+            success { echo '✅ SUCCESS — App live at http://localhost:3000' }
+            failure { echo '❌ FAILED — Check console output' }
+    }
+}

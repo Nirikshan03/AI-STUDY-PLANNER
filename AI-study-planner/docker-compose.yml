@@ -1,0 +1,87 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  AI Study Planner — Simple Docker Compose (3 containers only)
+#  Start:  docker-compose up --build
+#  Stop:   docker-compose down
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: studyplanner-postgres
+    environment:
+      POSTGRES_DB:       studyplanner_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  # 2. Spring Boot Backend (all-in-one monolith)
+  backend:
+    build: ./backend
+    container_name: studyplanner-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST:               postgres
+      DB_NAME:               studyplanner_db
+      DB_USER:               postgres
+      DB_PASSWORD:           ${DB_PASSWORD:-postgres}
+      JWT_SECRET:            ${JWT_SECRET:-studyplanner-super-secret-key-min-256-bits-long}
+      GOOGLE_CLIENT_ID:      ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET:  ${GOOGLE_CLIENT_SECRET:-}
+      GROQ_API_KEY:          ${GROQ_API_KEY:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY:    ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      MAIL_USERNAME:         ${MAIL_USERNAME:-}
+      MAIL_PASSWORD:         ${MAIL_PASSWORD:-}
+      FRONTEND_URL:          ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  # 3. React Frontend (nginx serves static + proxies /api to backend)
+  frontend:
+    build: ./frontend
+    container_name: studyplanner-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-net
+
+    jenkins:
+      image: jenkins/jenkins:lts
+      container_name: studyplanner-jenkins
+      user: root
+      ports:
+        - "8090:8080"
+        - "50000:50000"
+      volumes:
+        - jenkins_data:/var/jenkins_home
+        - /var/run/docker.sock:/var/run/docker.sock
+      networks:
+        - app-net
+      restart: unless-stopped
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  jenkins_data:
