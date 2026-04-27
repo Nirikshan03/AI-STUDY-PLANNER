@@ -1,8 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
-#  AI Study Planner — Simple Docker Compose (3 containers only)
-#  Start:  docker-compose up --build
-#  Stop:   docker-compose down
-# ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
@@ -26,7 +21,7 @@ services:
     networks:
       - app-net
 
-  # 2. Spring Boot Backend (all-in-one monolith)
+  # 2. Spring Boot Backend
   backend:
     build: ./backend
     container_name: studyplanner-backend
@@ -64,19 +59,20 @@ services:
     networks:
       - app-net
 
-    jenkins:
-      image: jenkins/jenkins:lts
-      container_name: studyplanner-jenkins
-      user: root
-      ports:
-        - "8090:8080"
-        - "50000:50000"
-      volumes:
-        - jenkins_data:/var/jenkins_home
-        - /var/run/docker.sock:/var/run/docker.sock
-      networks:
-        - app-net
-      restart: unless-stopped
+  # 4. Jenkins CI/CD
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: studyplanner-jenkins
+    user: root
+    ports:
+      - "8090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-net
+    restart: unless-stopped
 
 networks:
   app-net:

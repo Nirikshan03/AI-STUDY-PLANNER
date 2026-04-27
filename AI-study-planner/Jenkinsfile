@@ -12,7 +12,7 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                dir('backend') {
+                dir('AI-study-planner/backend') {      // ← ADD AI-study-planner/
                     sh 'chmod +x mvnw'
                     sh './mvnw clean package -DskipTests'
                 }
@@ -21,37 +21,41 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                dir('backend') {
+                dir('AI-study-planner/backend') {      // ← ADD AI-study-planner/
                     sh './mvnw test'
                 }
             }
-        post {
+            post {
                 always {
                     junit allowEmptyResults: true,
-                          testResults: 'backend/target/surefire-reports/*.xml'
+                          testResults: 'AI-study-planner/backend/target/surefire-reports/*.xml'
                 }
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                sh 'docker compose build backend frontend'
+                dir('AI-study-planner') {              // ← ADD AI-study-planner/
+                    sh 'docker compose build backend frontend'
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                sh 'docker compose up -d --force-recreate postgres'
-                sh 'sleep 10'
-                sh 'docker compose up -d --force-recreate backend'
-                sh 'sleep 5'
-                sh 'docker compose up -d --force-recreate frontend'
-                 }
+                dir('AI-study-planner') {              // ← ADD AI-study-planner/
+                    sh 'docker compose up -d --force-recreate postgres'
+                    sh 'sleep 10'
+                    sh 'docker compose up -d --force-recreate backend'
+                    sh 'sleep 5'
+                    sh 'docker compose up -d --force-recreate frontend'
+                }
             }
         }
+    }
 
-        post {
-            success { echo '✅ SUCCESS — App live at http://localhost:3000' }
-            failure { echo '❌ FAILED — Check console output' }
+    post {
+        success { echo '✅ SUCCESS — App live at http://localhost:3000' }
+        failure { echo '❌ FAILED — Check console output' }
     }
 }
