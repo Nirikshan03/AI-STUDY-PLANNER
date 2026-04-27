@@ -47,7 +47,7 @@ pipeline {
         }
     }
 }
-
+    }
     post {
         success {
             echo '✅ SUCCESS — App live at http://localhost:3000'
