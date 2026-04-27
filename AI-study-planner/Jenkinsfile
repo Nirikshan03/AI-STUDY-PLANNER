@@ -38,8 +38,13 @@ pipeline {
         stage('Deploy') {
             steps {
                 dir("${WORKSPACE}/AI-study-planner") {
-                    sh 'docker-compose down --remove-orphans'
-                    sh 'docker-compose up -d'
+                    sh 'docker-compose stop backend frontend postgres'
+                    sh 'docker-compose rm -f backend frontend postgres'
+                    sh 'docker-compose up -d postgres'
+                    sh 'sleep 10'
+                    sh 'docker-compose up -d backend'
+                    sh 'sleep 5'
+                    sh 'docker-compose up -d frontend'
                 }
             }
         }
