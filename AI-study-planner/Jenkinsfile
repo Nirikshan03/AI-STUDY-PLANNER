@@ -21,11 +21,9 @@ pipeline {
 
         stage('Install Docker Compose') {
             steps {
-                sh '''
-                    curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-                    chmod +x /usr/local/bin/docker-compose
-                    docker-compose --version
-                '''
+                sh 'curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose'
+                sh 'chmod +x /usr/local/bin/docker-compose'
+                sh 'docker-compose --version'
             }
         }
 
@@ -36,6 +34,7 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy') {
             steps {
                 dir("${WORKSPACE}/AI-study-planner") {
@@ -44,12 +43,15 @@ pipeline {
                 }
             }
         }
-    }
-}
+
     }
 
     post {
-        success { echo '✅ SUCCESS — App live at http://localhost:3000' }
-        failure { echo '❌ FAILED — Check console output' }
+        success {
+            echo '✅ SUCCESS — App live at http://localhost:3000'
+        }
+        failure {
+            echo '❌ FAILED — Check console output'
+        }
     }
 }
