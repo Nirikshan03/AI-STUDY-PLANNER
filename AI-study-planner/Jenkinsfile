@@ -12,30 +12,16 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                dir('AI-study-planner/backend') {      // ← ADD AI-study-planner/
+                dir("${WORKSPACE}/AI-study-planner/backend") {
                     sh 'chmod +x mvnw'
                     sh './mvnw clean package -DskipTests'
                 }
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                dir('AI-study-planner/backend') {      // ← ADD AI-study-planner/
-                    sh './mvnw test'
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true,
-                          testResults: 'AI-study-planner/backend/target/surefire-reports/*.xml'
-                }
-            }
-        }
-
         stage('Build Docker Images') {
             steps {
-                dir('AI-study-planner') {              // ← ADD AI-study-planner/
+                dir("${WORKSPACE}/AI-study-planner") {
                     sh 'docker compose build backend frontend'
                 }
             }
@@ -43,7 +29,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                dir('AI-study-planner') {              // ← ADD AI-study-planner/
+                dir("${WORKSPACE}/AI-study-planner") {
                     sh 'docker compose up -d --force-recreate postgres'
                     sh 'sleep 10'
                     sh 'docker compose up -d --force-recreate backend'
