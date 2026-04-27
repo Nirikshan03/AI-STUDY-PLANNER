@@ -36,15 +36,13 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy') {
             steps {
                 dir("${WORKSPACE}/AI-study-planner") {
-                sh 'docker-compose up -d --remove-orphans postgres'
-                sh 'sleep 10'
-                sh 'docker-compose up -d --force-recreate --no-deps backend'
-                sh 'sleep 5'
-                sh 'docker-compose up -d --force-recreate --no-deps frontend'
+                    sh 'docker-compose down --remove-orphans'
+                    sh 'docker-compose up -d'
+                }
+            }
         }
     }
 }
