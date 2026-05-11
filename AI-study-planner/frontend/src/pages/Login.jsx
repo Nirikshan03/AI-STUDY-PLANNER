@@ -38,7 +38,7 @@ export default function Login({ onLogin }) {
 
   // Real Google OAuth2 — redirects to Spring Boot
   const handleGoogleLogin = () => {
-    window.location.href = "/oauth2/authorization/google";
+    window.location.href = "https://ai-study-planner-h7ij.onrender.com/oauth2/authorization/google";
   };
 
   return (
