@@ -1,0 +1,29 @@
+# ─── API proxy → Render backend ───────────────────────────────────────────────
+# All /api/* calls (login, register, quiz, etc.) go to Render
+[[redirects]]
+  from   = "/api/*"
+  to     = "https://ai-study-planner-h7ij.onrender.com/api/:splat"
+  status = 200
+  force  = true
+
+# Google OAuth flow (browser redirect to Spring Security)
+[[redirects]]
+  from   = "/oauth2/*"
+  to     = "https://ai-study-planner-h7ij.onrender.com/oauth2/:splat"
+  status = 200
+  force  = true
+
+# Spring Security OAuth2 callback path
+[[redirects]]
+  from   = "/login/oauth2/*"
+  to     = "https://ai-study-planner-h7ij.onrender.com/login/oauth2/:splat"
+  status = 200
+  force  = true
+
+# ─── SPA fallback — MUST be last ──────────────────────────────────────────────
+# Any path not matched above (e.g. /dashboard, /quiz, /oauth2/callback)
+# returns index.html so React can handle it
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
