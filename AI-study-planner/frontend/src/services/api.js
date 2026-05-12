@@ -1,180 +1,106 @@
-package com.studyplanner.security;
+const BASE_URL = "/api";
 
-import com.studyplanner.repository.UserRepository;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.*;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
-import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+const getToken = () => localStorage.getItem("token") || "";
 
-import java.io.*;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
+const getHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${getToken()}`,
+});
 
-@Configuration
-@EnableWebSecurity
-@RequiredArgsConstructor
-public class SecurityConfig {
+async function request(method, path, body = null, isFormData = false) {
+  const headers = isFormData
+    ? { Authorization: `Bearer ${getToken()}` }
+    : getHeaders();
 
-    private final JwtFilter jwtFilter;
-    private final UserRepository userRepository;
-    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : null,
+    });
+  } catch (e) {
+    throw new Error("Cannot connect to server. Make sure the backend is running.");
+  }
 
-    // ── Cookie-based OAuth2 authorization request repository ──────────────────
-    // Uses Java serialization (not Jackson) because OAuth2AuthorizationRequest
-    // has no Jackson-compatible constructor and cannot be round-tripped with JSON.
-    // The cookie survives Render free-tier spin-downs between the two redirect hops.
-    public static class CookieAuthorizationRequestRepository
-            implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
+  if (res.status === 302 || res.redirected) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+    throw new Error("Session expired. Please log in again.");
+  }
 
-        private static final String COOKIE_NAME  = "oauth2_auth_req";
-        private static final int    COOKIE_MAX_AGE = 180; // 3 minutes
+  if (res.status === 401 || res.status === 403) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+    throw new Error("Unauthorized. Please log in.");
+  }
 
-        @Override
-        public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
-            return readCookie(request);
-        }
+  const text = await res.text();
 
-        @Override
-        public void saveAuthorizationRequest(OAuth2AuthorizationRequest authRequest,
-                                             HttpServletRequest request,
-                                             HttpServletResponse response) {
-            if (authRequest == null) {
-                clearCookie(response);
-                return;
-            }
-            try {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
-                    oos.writeObject(authRequest);
-                }
-                String value = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
-                Cookie cookie = new Cookie(COOKIE_NAME, value);
-                cookie.setPath("/");
-                cookie.setHttpOnly(true);
-                cookie.setSecure(true);   // HTTPS only on Render
-                cookie.setMaxAge(COOKIE_MAX_AGE);
-                response.addCookie(cookie);
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to serialize OAuth2AuthorizationRequest", e);
-            }
-        }
-
-        @Override
-        public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
-                                                                      HttpServletResponse response) {
-            OAuth2AuthorizationRequest req = readCookie(request);
-            if (req != null) clearCookie(response);
-            return req;
-        }
-
-        private OAuth2AuthorizationRequest readCookie(HttpServletRequest request) {
-            if (request.getCookies() == null) return null;
-            return Arrays.stream(request.getCookies())
-                    .filter(c -> COOKIE_NAME.equals(c.getName()))
-                    .findFirst()
-                    .map(c -> {
-                        try {
-                            byte[] bytes = Base64.getUrlDecoder().decode(c.getValue());
-                            try (ObjectInputStream ois = new ObjectInputStream(
-                                    new ByteArrayInputStream(bytes))) {
-                                return (OAuth2AuthorizationRequest) ois.readObject();
-                            }
-                        } catch (Exception e) {
-                            return null;
-                        }
-                    })
-                    .orElse(null);
-        }
-
-        private void clearCookie(HttpServletResponse response) {
-            Cookie cookie = new Cookie(COOKIE_NAME, "");
-            cookie.setPath("/");
-            cookie.setMaxAge(0);
-            response.addCookie(cookie);
-        }
+  if (!res.ok) {
+    try {
+      const j = JSON.parse(text);
+      throw new Error(j.error || j.message || `Error ${res.status}`);
+    } catch (parseErr) {
+      if (parseErr.message.startsWith("Error ") || text) {
+        throw new Error(text || `Error ${res.status}`);
+      }
+      throw parseErr;
     }
+  }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/auth/**",
-                    "/oauth2/**",
-                    "/login/oauth2/**",
-                    "/swagger-ui/**",
-                    "/v3/api-docs/**",
-                    "/actuator/**"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .oauth2Login(oauth -> oauth
-                .authorizationEndpoint(ep -> ep
-                    .authorizationRequestRepository(new CookieAuthorizationRequestRepository())
-                )
-                .successHandler(oAuth2SuccessHandler)
-            )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return email -> userRepository.findByEmail(email)
-            .map(u -> User.withUsername(u.getEmail())
-                .password(u.getPassword() != null ? u.getPassword() : "")
-                .roles(u.getRole().name()).build())
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
-
-    @Bean
-    public AuthenticationProvider authProvider() {
-        DaoAuthenticationProvider p = new DaoAuthenticationProvider();
-        p.setUserDetailsService(userDetailsService());
-        p.setPasswordEncoder(passwordEncoder());
-        return p;
-    }
-
-    @Bean
-    public AuthenticationManager authManager(AuthenticationConfiguration cfg) throws Exception {
-        return cfg.getAuthenticationManager();
-    }
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return text; }
 }
+
+export const authAPI = {
+  register: (d) => request("POST", "/auth/register", d),
+  login:    (d) => request("POST", "/auth/login", d),
+  validate: ()  => request("GET",  "/auth/validate"),
+};
+
+export const quizAPI = {
+  generate:        (d)  => request("POST", "/quiz/generate", d),
+  getUserQuizzes:  (id) => request("GET",  `/quiz/user/${id}`),
+  getQuiz:         (id) => request("GET",  `/quiz/${id}`),
+  submitAttempt:   (d)  => request("POST", "/quiz/attempt", d),
+  getUserAttempts: (id) => request("GET",  `/quiz/attempts/${id}`),
+  getStats:        (id) => request("GET",  `/quiz/stats/${id}`),
+};
+
+export const materialAPI = {
+  upload: (file, userId, subject) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("userId", userId);
+    form.append("subject", subject);
+    return request("POST", "/materials/upload", form, true);
+  },
+  getUserMaterials: (id) => request("GET",    `/materials/user/${id}`),
+  getMaterial:      (id) => request("GET",    `/materials/${id}`),
+  deleteMaterial:   (id) => request("DELETE", `/materials/${id}`),
+};
+
+export const analyticsAPI = {
+  getDashboard:      (id) => request("GET",  `/analytics/dashboard/${id}`),
+  getWeeklyTrend:    (id) => request("GET",  `/analytics/trend/${id}`),
+  logSession:        (d)  => request("POST", "/analytics/session", d),
+  logScore:          (d)  => request("POST", "/analytics/score", d),
+  getRecommendation: (id) => request("GET",  `/analytics/recommendation/${id}`).then(r => r?.recommendation || null),
+};
+
+export const groupAPI = {
+  create:          (d)     => request("POST", "/groups", d),
+  join:            (d)     => request("POST", "/groups/join", d),
+  getUserGroups:   (id)    => request("GET",  `/groups/user/${id}`),
+  getLeaderboard:  (id)    => request("GET",  `/groups/${id}/leaderboard`),
+  addXp:           (id, d) => request("POST", `/groups/${id}/xp`, d),
+  getChallenges:   (id)    => request("GET",  `/groups/${id}/challenges`),
+  createChallenge: (id, d) => request("POST", `/groups/${id}/challenges`, d),
+};
+
+export const notificationAPI = {
+  sendReminder: (d) => request("POST", "/notifications/reminder", d),
+};
