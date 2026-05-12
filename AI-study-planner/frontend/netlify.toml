@@ -9,15 +9,9 @@
 [[redirects]]
   from   = "/oauth2/authorization/*"
   to     = "https://ai-study-planner-h7ij.onrender.com/oauth2/authorization/:splat"
-  status = 200
+  status = 301
   force  = true
 
-# Spring Security OAuth2 callback path
-[[redirects]]
-  from   = "/login/oauth2/*"
-  to     = "https://ai-study-planner-h7ij.onrender.com/login/oauth2/:splat"
-  status = 200
-  force  = true
 
 # ─── SPA fallback — MUST be last ──────────────────────────────────────────────
 # /oauth2/callback?token=... will fall through to here and React handles it
